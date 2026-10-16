@@ -1,0 +1,55 @@
+name: Bot de pruebas CRM
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'qa/**'
+      - '.github/workflows/qa-demo.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'qa/**'
+      - '.github/workflows/qa-demo.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qa-demo-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  probar-formulario:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: qa/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependencias verificadas por lockfile
+        run: npm ci
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Probar escritorio y móvil
+        run: npm test
+      - name: Emitir resumen y sugerencias de corrección
+        if: always()
+        run: npm run report
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-bot-crm
+          path: |
+            qa/results/
+            qa/playwright-report/
+          retention-days: 7
+          if-no-files-found: warn
